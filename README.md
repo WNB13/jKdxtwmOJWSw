@@ -1,335 +1,125 @@
-# Shadowsocks 一键部署说明
+# deploy_ss_opt.sh
 
-本仓库当前推荐使用的服务端脚本是 `install_ss_443.sh`。
+## 用途
 
-脚本用途：
+这个脚本用于在 Debian / Ubuntu 服务器上部署 `shadowsocks-libev`。
 
-- 在 `Ubuntu 22.04 / Debian` 上安装 `shadowsocks-libev`
-- 写入 `/etc/shadowsocks-libev/config.json`
-- 创建并启用本地 `systemd` 服务 `shadowsocks-libev-local.service`
-- 默认监听 `443`，同时启用 `TCP + UDP`
-- 输出 `SS URI`、`Clash` 节点片段，并保存到 `/root/ss_uri.txt`
+核心能力：
 
-## 免责说明
-
-- 本项目内容仅供学习、研究、测试和服务器运维演示之用。
-- 使用者仅可在合法、合规且已获得充分授权的前提下使用本项目中的脚本、配置和文档。
-- 严禁将本项目用于任何违反当地法律法规、云服务商条款、网络运营商规则或目标平台使用协议的场景。
-- 使用者应自行评估并承担部署、配置、访问、账号、IP、带宽、内容请求及第三方服务策略变化所带来的全部风险与责任。
-- 因使用本项目而产生的服务不可用、连接失败、限速、封禁、标记、数据泄露、数据丢失、账号异常或任何直接、间接损失，均由使用者自行承担。
-- 仓库维护者仅提供学习性质的示例内容，不对任何使用结果、业务连续性或衍生损失承担责任。
+- 单实例部署：监听 `0.0.0.0:<PORT>`。
+- 多实例部署：每个实例独立监听指定 IP / 端口。
+- 多实例可指定独立出口 IP，让代理流量从指定公网 IP 对外显示。
+- 自动写入 source-based policy route，提升多公网 IP / 多出口场景下的出口稳定性。
+- 为每个实例生成可导入 Clash 的 YAML 文件。
+- 可选启动 HTTP 静态服务，输出每个客户端自己的 YAML 地址。
+- 输出 `ss://` 链接、Clash 节点片段、YAML 文件；启用 HTTP 时额外输出 HTTP 地址，并保存到 `/root/ss_uri.txt`。
 
 ## 环境要求
 
-- 操作系统：`Ubuntu 22.04` 或其他 `Debian` 系发行版
-- 权限：`root` 或可用 `sudo`
-- 网络：服务器可访问 `apt` 源
-- 安全组：放行 `TCP 443` 和 `UDP 443`
-- 本地客户端：`Clash Verge` / `Clash Meta` / `mihomo` 兼容客户端
-
-## 脚本行为
-
-脚本 [install\_ss\_443.sh](file:///Users/lining/Documents/vless/install_ss_443.sh) 默认参数如下：
-
-- 端口：`443`
-- 加密算法：`chacha20-ietf-poly1305`
-- 密码：未传入时自动生成
-- 配置文件：`/etc/shadowsocks-libev/config.json`
-- 服务名：`shadowsocks-libev-local.service`
-- 输出文件：`/root/ss_uri.txt`
-- 默认标签：`my-ss-443-YYYYMMDDHHMMSS`
+- Debian / Ubuntu，且使用 `systemd`
+- root 权限
+- 服务器上已绑定需要使用的公网 IP
+- 云厂商安全组放行对应端口的 TCP / UDP
 
 ## 快速开始
 
-### 上传脚本
+单实例：
 
 ```bash
-scp install_ss_443.sh root@<SERVER_IP>:/root/
+sudo bash deploy_ss_opt.sh
 ```
 
-### 执行部署
-
-推荐显式指定密码：
+多实例，监听 IP 和出口 IP 相同：
 
 ```bash
-sudo bash /root/install_ss_443.sh --password '你的强密码'
+sudo bash /root/deploy_ss_opt.sh \
+  --method chacha20-ietf-poly1305 \
+  --yaml-http-enable yes \
+  --yaml-http-bind 0.0.0.0 \
+  --yaml-http-host 72.249.207.28 \
+    --instance '72.249.207.28|443|us-node01-01|password|72.249.207.28' \
+    --instance '23.144.132.62|443|us-node01-02|password|23.144.132.62'
 ```
 
-也可以让脚本自动生成密码：
-
-```bash
-sudo bash /root/install_ss_443.sh
-```
-
-部署完成后，终端会输出：
-
-- 服务状态摘要
-- 端口监听结果
-- `SS URI`
-- `Clash` 节点片段
-- 二维码
-
-同时会写入：
-
-- `/root/ss_uri.txt`
-
-## 参数说明
+启用 YAML HTTP 后会生成类似下面的地址：
 
 ```text
-Usage:
-  sudo bash install_ss_443.sh [options]
-
-Options:
-  --password <PASS>            Shadowsocks password (default: auto generate)
-  --port <PORT>                Server port (default: 443)
-  --method <METHOD>            Cipher method (default: chacha20-ietf-poly1305)
-  --tag <TAG>                  SS URI tag
-  --server-ip <IP>             Override server IP shown in output
-  --enable-ufw <auto|yes|no>   Manage UFW rules (default: auto)
-  --conf-name <NAME>           Reserved parameter
-  --out-file <PATH>            Write result to file (default: /root/ss_uri.txt)
-  -h, --help                   Show this help
+http://72.249.207.28:18080/192.168.10.35.yaml
+http://72.249.207.28:18080/192.168.10.45.yaml
 ```
 
-## 常用命令
+每台客户端只需要拿自己的 YAML 文件或 HTTP 地址即可，复制后可直接导入 Clash 使用。
 
-### 默认 443 端口
+多实例，监听 IP 和出口 IP 分开控制：
 
 ```bash
-sudo bash install_ss_443.sh --password 'StrongPass_2026'
+sudo bash /root/deploy_ss_opt.sh \
+    --instance '72.249.207.28|443|us-node01-01|password|72.249.207.28' \
+    --instance '23.144.132.62|443|us-node01-02|password|23.144.132.62'
 ```
 
-### 自定义端口
-
-```bash
-sudo bash install_ss_443.sh --password 'StrongPass_2026' --port 8443
-```
-
-### 指定输出 IP
-
-```bash
-sudo bash install_ss_443.sh --password 'StrongPass_2026' --server-ip 23.144.132.142
-```
-
-### 强制写入 UFW 规则
-
-```bash
-sudo bash install_ss_443.sh --password 'StrongPass_2026' --enable-ufw yes
-```
-
-## 服务端输出文件
-
-脚本会生成如下文件：
-
-### 服务端配置
-
-路径：`/etc/shadowsocks-libev/config.json`
-
-示例：
-
-```json
-{
-  "server": "0.0.0.0",
-  "server_port": 443,
-  "password": "your_password",
-  "timeout": 300,
-  "method": "chacha20-ietf-poly1305",
-  "mode": "tcp_and_udp",
-  "fast_open": false
-}
-```
-
-### systemd 服务
-
-路径：`/etc/systemd/system/shadowsocks-libev-local.service`
-
-示例：
-
-```ini
-[Unit]
-Description=Local Shadowsocks-libev Server
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/ss-server -c /etc/shadowsocks-libev/config.json
-Restart=on-failure
-RestartSec=3
-LimitNOFILE=51200
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### 节点信息输出
-
-路径：`/root/ss_uri.txt`
-
-示例：
+## 多实例格式
 
 ```text
-server: 23.144.132.142
-port: 443
-method: chacha20-ietf-poly1305
-password: your_password
-ss_uri: ss://xxxxx@23.144.132.142:443#my-ss-443-20260511123045
+LISTEN_IP|PORT|TAG|PASSWORD|EGRESS_IP
 ```
 
-## 指定配置.png 对应输出
+- `LISTEN_IP`：服务监听 IP，必须已绑定在本机。
+- `PORT`：监听端口，可空，默认使用 `--port` 或 `443`。
+- `TAG`：节点显示名称，可空。
+- `PASSWORD`：节点密码，可空；已有实例会复用旧密码，新实例会自动生成。
+- `EGRESS_IP`：出口 IP，可空；默认等于 `LISTEN_IP`，必须已绑定在本机。
 
-示意图：[指定配置.png](/指定配置.png)
+## 出口控制逻辑
 
-如果你要得到和图里一致的 `Clash` 节点区域，可直接使用脚本输出的片段，格式如下：
+多实例模式下，每个实例会生成：
 
-```yaml
-proxies:
-  - name: "SS-23.144.132.142-443"
-    type: ss
-    server: "23.144.132.142"
-    port: 443
-    cipher: chacha20-ietf-poly1305
-    password: "%1qa2ws3ed%"
-    udp: true
-```
+- `/etc/shadowsocks-libev/<实例名>.json`
+- `/etc/shadowsocks-libev/<实例名>.egress`
+- `/root/clash-yaml/<TAG>.yaml`
+- `shadowsocks-libev-ss@<实例名>.service`
 
-如果要和图里的代理组写法保持一致，可以继续补上：
-
-```yaml
-proxy-groups:
-  - name: "节点选择"
-    type: select
-    proxies:
-      - 自动选择
-      - 手动切换
-      - DIRECT
-
-  - name: "手动切换"
-    type: select
-    proxies:
-      - SS-23.144.132.142-443
-      - DIRECT
-
-  - name: "自动选择"
-    type: url-test
-    proxies:
-      - SS-23.144.132.142-443
-    url: "http://www.gstatic.com/generate_204"
-    interval: 300
-    tolerance: 50
-```
-
-注意事项：
-
-- `password` 如果以 `%` 开头或包含特殊字符，必须加引号。
-- `手动切换` 和 `自动选择` 中引用的节点名，必须和 `proxies` 里的 `name` 完全一致。
-- `server` 应填你的服务器公网 IP。
-
-## Clash YAML 模板
-
-下面是一份最小可用模板，可直接保存为 `clash.yaml`：
-
-```yaml
-mixed-port: 7897
-allow-lan: false
-mode: rule
-log-level: info
-
-proxies:
-  - name: "SS-23.144.132.142-443"
-    type: ss
-    server: "23.144.132.142"
-    port: 443
-    cipher: chacha20-ietf-poly1305
-    password: "%1qa2ws3ed%"
-    udp: true
-
-proxy-groups:
-  - name: "PROXY"
-    type: select
-    proxies:
-      - "SS-23.144.132.142-443"
-      - DIRECT
-
-rules:
-  - GEOIP,CN,DIRECT
-  - MATCH,PROXY
-```
-
-## 验收步骤
-
-### 服务器侧
+实例服务启动时会执行：
 
 ```bash
-systemctl status shadowsocks-libev-local.service --no-pager
-ss -lunpt | grep ':443'
-cat /root/ss_uri.txt
+ss-server -c <实例配置> -b <EGRESS_IP>
 ```
 
-期望结果：
+同时脚本默认写入源地址策略路由：
 
-- `shadowsocks-libev-local.service` 为 `active (running)`
-- 看到 `0.0.0.0:443` 对应的 TCP/UDP 监听
-- `/root/ss_uri.txt` 中已生成节点信息
-
-### 客户端侧
-
-- 导入 `Clash` 配置
-- 启用配置并连接节点
-- 访问 [ip.sb](https://ip.sb) 或 [ipinfo.io](https://ipinfo.io)
-- 出口 IP 应为服务器公网 IP
-
-## 常见问题
-
-### 提示未找到 ss-server
-
-执行：
-
-```bash
-command -v ss-server
+```text
+from <EGRESS_IP> lookup <独立路由表>
 ```
 
-如果为空，说明 `shadowsocks-libev` 安装异常，可重新执行：
+这样可以让不同实例的出站连接按源地址进入对应路由表，减少系统默认路由导致的出口漂移。
 
-```bash
-apt-get update -y
-apt-get install -y shadowsocks-libev
-```
+## 主要参数
 
-### 服务启动失败
+- `--password <PASS>`：单实例密码。
+- `--port <PORT>`：默认端口，默认 `443`。
+- `--method <METHOD>`：加密方式，默认 `chacha20-ietf-poly1305`。
+- `--tag <TAG>`：单实例节点名。
+- `--server-ip <IP>`：单实例输出地址覆盖。
+- `--enable-ufw <auto|yes|no>`：是否自动配置 UFW。
+- `--enable-egress-route <auto|yes|no>`：多实例是否写入源地址策略路由，默认 `auto`。
+- `--egress-probe-ip <IP>`：用于探测出口网关和网卡的目标 IP，默认 `1.1.1.1`。
+- `--conf-name <NAME>`：多实例配置名前缀，默认 `ss443`。
+- `--out-file <PATH>`：输出文件，默认 `/root/ss_uri.txt`。
+- `--yaml-dir <PATH>`：Clash YAML 输出目录，默认 `/root/clash-yaml`。
+- `--yaml-http-enable <yes|no>`：是否启动 YAML HTTP 服务，默认 `no`。
+- `--yaml-http-port <PORT>`：YAML HTTP 服务端口，默认 `18080`。
+- `--yaml-http-host <HOST>`：生成 HTTP 地址时使用的公网 IP 或域名，默认自动选择。
+- `--yaml-http-bind <ADDR>`：YAML HTTP 服务监听地址，默认 `127.0.0.1`；需要公网访问时显式设置为 `0.0.0.0`。
+- `--instance <SPEC>`：多实例配置，可重复传入。
 
-执行：
+## 注意事项
 
-```bash
-systemctl status shadowsocks-libev-local.service --no-pager
-journalctl -u shadowsocks-libev-local.service -n 80 --no-pager
-cat /etc/shadowsocks-libev/config.json
-```
-
-### Clash 校验失败
-
-常见原因：
-
-- 节点名引用不一致
-- `password` 含 `%`、`:`、`#` 等特殊字符但未加引号
-- 使用了中文弯引号，而不是英文引号
-
-## 回滚与重部署
-
-停止服务：
-
-```bash
-sudo systemctl stop shadowsocks-libev-local.service
-```
-
-重新部署：
-
-```bash
-sudo bash install_ss_443.sh --password '新密码'
-```
-
-## 相关文件
-
-- [install\_ss\_443.sh](file:///Users/lining/Documents/vless/install_ss_443.sh)
-- [clash.yaml](file:///Users/lining/Documents/vless/clash.yaml)
-- [指定配置.png](file:///Users/lining/Documents/vless/%E6%8C%87%E5%AE%9A%E9%85%8D%E7%BD%AE.png)
+- `LISTEN_IP` 和 `EGRESS_IP` 都必须是本机已有地址。
+- 如果服务器有多网卡 / 多网关，建议保持 `--enable-egress-route auto`。
+- 如果路由探测失败，可以先检查 `ip route get 1.1.1.1 from <EGRESS_IP>`。
+- 已存在的 YAML 文件只有在归属实例匹配时才会覆盖；如果 `TAG` 归一化后撞到其他实例文件，脚本会拒绝继续。
+- 当脚本管理 UFW 时，端口放行或 reload 失败会中止部署；如果只使用云安全组，可以保持 `--enable-ufw auto` 或设为 `no`。
+- YAML HTTP 服务默认不启动；需要公网 HTTP 地址时加 `--yaml-http-enable yes --yaml-http-bind 0.0.0.0`，并在安全组放行 `18080/tcp`。
+- YAML 文件和 HTTP 地址包含明文节点密码，只发给对应客户端。
+- 输出文件包含明文密码，请妥善保管。
+- 本项目内容仅供合法授权的服务器运维、学习和测试使用。
