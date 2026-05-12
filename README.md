@@ -1,4 +1,4 @@
-# deploy_ss_opt.sh
+# Shadowsocks-libev 多 IP 出口一键部署脚本
 
 ## 用途
 
@@ -21,6 +21,40 @@
 - 服务器上已绑定需要使用的公网 IP
 - 云厂商安全组放行对应端口的 TCP / UDP
 
+## 一键部署
+
+直接远程执行：
+
+```bash
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/WNB13/TbiqlSRZr7EY/main/deploy_ss_oneclick.sh) \
+  --password '你的强密码' \
+  --port 8443
+```
+
+多实例并启用 YAML HTTP 地址：
+
+```bash
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/WNB13/TbiqlSRZr7EY/main/deploy_ss_oneclick.sh) \
+  --method chacha20-ietf-poly1305 \
+  --yaml-http-enable yes \
+  --yaml-http-bind 0.0.0.0 \
+  --yaml-http-port 18080 \
+  --instance '72.249.207.28|443|us-node01-01|password|72.249.207.28' \
+  --instance '23.144.132.62|443|us-node01-02|password|23.144.132.62'
+```
+
+也可以先下载到服务器再执行：
+
+```text
+https://github.com/WNB13/jKdxtwmOJWSw/blob/main/deploy_ss_opt.sh
+```
+
+```bash
+sudo curl -fsSL https://raw.githubusercontent.com/WNB13/jKdxtwmOJWSw/main/deploy_ss_opt.sh -o /root/deploy_ss_opt.sh
+sudo chmod +x /root/deploy_ss_opt.sh
+sudo bash /root/deploy_ss_opt.sh
+```
+
 ## 快速开始
 
 单实例：
@@ -37,15 +71,15 @@ sudo bash /root/deploy_ss_opt.sh \
   --yaml-http-enable yes \
   --yaml-http-bind 0.0.0.0 \
   --yaml-http-host 72.249.207.28 \
-    --instance '72.249.207.28|443|us-node01-01|password|72.249.207.28' \
-    --instance '23.144.132.62|443|us-node01-02|password|23.144.132.62'
+  --instance '72.249.207.28|443|us-node01-01|password|72.249.207.28' \
+  --instance '23.144.132.62|443|us-node01-02|password|23.144.132.62'
 ```
 
 启用 YAML HTTP 后会生成类似下面的地址：
 
 ```text
-http://72.249.207.28:18080/192.168.10.35.yaml
-http://72.249.207.28:18080/192.168.10.45.yaml
+http://72.249.207.28:18080/us-node01-01.yaml
+http://72.249.207.28:18080/us-node01-02.yaml
 ```
 
 每台客户端只需要拿自己的 YAML 文件或 HTTP 地址即可，复制后可直接导入 Clash 使用。
@@ -54,8 +88,8 @@ http://72.249.207.28:18080/192.168.10.45.yaml
 
 ```bash
 sudo bash /root/deploy_ss_opt.sh \
-    --instance '72.249.207.28|443|us-node01-01|password|72.249.207.28' \
-    --instance '23.144.132.62|443|us-node01-02|password|23.144.132.62'
+  --instance '72.249.207.28|443|us-node01-01|password|72.249.207.28' \
+  --instance '23.144.132.62|443|us-node01-02|password|23.144.132.62'
 ```
 
 ## 多实例格式
